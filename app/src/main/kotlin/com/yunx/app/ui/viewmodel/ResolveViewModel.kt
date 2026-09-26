@@ -431,7 +431,7 @@ class ResolveViewModel(
                     runCatching {
                         currentRepo().getShareDownloadLink(s, file, quarkCred ?: "").getOrNull()?.let { link ->
                             // 文件夹内文件用相对路径（保持目录结构）；根目录文件用取链返回的文件名
-                            enqueueDownload(link, quarkCred, if (relPath.isBlank()) link.filename else relPath)
+                            enqueueDownload(link, quarkCred ?: "", if (relPath.isBlank()) link.filename else relPath)
                             okCount++
                         }
                     }
