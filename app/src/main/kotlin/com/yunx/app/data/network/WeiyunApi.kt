@@ -318,7 +318,7 @@ class WeiyunApi(
 
         val all = mutableListOf<ShareFile>()
         var start = 0
-        repeat(100) { // 封顶 100 页防异常死循环
+        for (page in 0 until 100) { // 封顶 100 页防异常死循环
             val data = JSONObject()
                 .put("dir_key", effectiveDirKey)
                 .put("start", start)
@@ -478,7 +478,7 @@ class WeiyunApi(
             .post(body.toRequestBody(jsonMediaType))
             .build()
 
-        client.newCall(request).execute().use { response ->
+        return client.newCall(request).execute().use { response ->
             val respBody = response.body?.string()
                 ?: throw IllegalStateException("请求失败：响应为空（${response.code}）")
             if (response.code != 200) {

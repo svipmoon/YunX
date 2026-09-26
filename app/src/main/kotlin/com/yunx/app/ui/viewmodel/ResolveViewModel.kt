@@ -407,7 +407,7 @@ class ResolveViewModel(
                 val tasks = mutableListOf<Pair<ShareFile, String>>()
                 for (file in files) {
                     if (file.isdir) {
-                        collectShareFolder(s, file.fid, file.fname, quarkCred, tasks, 0)
+                        collectShareFolder(s, file.fid, file.fname ?: "", quarkCred ?: "", tasks, 0)
                     } else {
                         tasks.add(file to "")
                     }
@@ -429,7 +429,7 @@ class ResolveViewModel(
                     val (file, relPath) = task
                     batchProgress = "${index + 1}/${tasks.size}"
                     runCatching {
-                        currentRepo().getShareDownloadLink(s, file, quarkCred).getOrNull()?.let { link ->
+                        currentRepo().getShareDownloadLink(s, file, quarkCred ?: "").getOrNull()?.let { link ->
                             // 文件夹内文件用相对路径（保持目录结构）；根目录文件用取链返回的文件名
                             enqueueDownload(link, quarkCred, if (relPath.isBlank()) link.filename else relPath)
                             okCount++
@@ -557,13 +557,13 @@ class ResolveViewModel(
                 return@launch
             }
             val repo = currentRepo()
-            repo.createSession(link, pwd, credential)
+            repo.createSession(link, pwd, credential ?: "")
                 .onSuccess { s ->
                     session = s
                     currentDirFid = currentDefaultDirFid()
                     dirStack.clear()
                     pathNames = emptyList()
-                    loadFiles(s, currentDirFid, credential, repo)
+                    loadFiles(s, currentDirFid, credential ?: "", repo)
                 }
                 .onFailure { e ->
                     uiState = ResolveUiState.Error(e.message ?: "解析失败")
@@ -584,7 +584,7 @@ class ResolveViewModel(
                 uiState = ResolveUiState.Error("登录已失效，请重新登录")
                 return@launch
             }
-            loadFiles(s, file.fid, credential, currentRepo())
+            loadFiles(s, file.fid, credential ?: "", currentRepo())
         }
     }
 
@@ -685,7 +685,7 @@ class ResolveViewModel(
                     SharePlatform.UC -> ucAccountRepository.getFreshCookie() ?: credential
                     else -> credential
                 }
-                currentRepo().getShareDownloadLink(s, file, quarkCred)
+                currentRepo().getShareDownloadLink(s, file, quarkCred ?: "")
                     .onSuccess { downloadLink = it }
                     .onFailure { downloadError = it.message ?: "获取下载链接失败" }
             } finally {
