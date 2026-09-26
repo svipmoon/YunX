@@ -91,6 +91,7 @@ import com.yunx.app.ui.viewmodel.QuarkCloudViewModel
 import com.yunx.app.ui.viewmodel.ResolveUiState
 import com.yunx.app.ui.viewmodel.ResolveViewModel
 import com.yunx.app.ui.viewmodel.UCCoudViewModel
+import com.yunx.app.ui.viewmodel.WeiyunCloudViewModel
 import com.yunx.app.ui.viewmodel.XunleiCloudViewModel
 
 /**
@@ -113,6 +114,8 @@ fun ResolveScreen(
     ucCloudViewModel: UCCoudViewModel,
     /** 123 云盘浏览 ViewModel（123 分享转存目录选择用） */
     pan123CloudViewModel: Pan123CloudViewModel,
+    /** 微云云盘浏览 ViewModel（保留参数，微云分享无需转存） */
+    weiyunCloudViewModel: WeiyunCloudViewModel,
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.uiState
@@ -470,6 +473,7 @@ private fun platformLabel(platform: SharePlatform): String = when (platform) {
     SharePlatform.BAIDU -> "百度网盘"
     SharePlatform.C139 -> "139 网盘"
     SharePlatform.PAN123 -> "123云盘"
+    SharePlatform.WEIYUN -> "微云"
 }
 
 /** 剪贴板分享链接提示卡片：检测到分享链接时，询问是否粘贴解析 */

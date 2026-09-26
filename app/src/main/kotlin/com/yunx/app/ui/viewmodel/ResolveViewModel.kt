@@ -38,6 +38,7 @@ import com.yunx.app.data.network.ShareLinkParser
 import com.yunx.app.data.network.SharePlatform
 import com.yunx.app.data.network.UCConstants
 import com.yunx.app.data.network.XunleiConstants
+import com.yunx.app.data.network.WeiyunConstants
 import com.yunx.app.data.network.model.DownloadLink
 import com.yunx.app.data.network.model.ShareFile
 import com.yunx.app.data.network.model.ShareSession
@@ -54,6 +55,8 @@ import com.yunx.app.data.repository.UCAccountRepository
 import com.yunx.app.data.repository.UCResolveRepository
 import com.yunx.app.data.repository.XunleiAccountRepository
 import com.yunx.app.data.repository.XunleiResolveRepository
+import com.yunx.app.data.repository.WeiyunAccountRepository
+import com.yunx.app.data.repository.WeiyunResolveRepository
 import com.yunx.app.ui.SnackbarController
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +85,8 @@ class ResolveViewModel(
     private val c139ResolveRepository: C139ResolveRepository,
     private val pan123AccountRepository: Pan123AccountRepository,
     private val pan123ResolveRepository: Pan123ResolveRepository,
+    private val weiyunAccountRepository: WeiyunAccountRepository,
+    private val weiyunResolveRepository: WeiyunResolveRepository,
     private val downloadManager: DownloadManager,
     private val bookmarkDao: BookmarkDao
 ) : ViewModel() {
@@ -111,7 +116,7 @@ class ResolveViewModel(
     var saveMessage by mutableStateOf<String?>(null)
         private set
 
-    /** 当前分享是否支持转存（夸克 / UC / 迅雷 / 百度 / 139 / 123） */
+    /** 当前分享是否支持转存（夸克 / UC / 迅雷 / 百度 / 139 / 123；微云分享无需转存） */
     val canSave: Boolean
         get() = currentPlatform == SharePlatform.QUARK ||
             currentPlatform == SharePlatform.UC ||
@@ -388,7 +393,7 @@ class ResolveViewModel(
             batchCancelRequested = false
             try {
                 val credential = currentCredential()
-                if (credential.isNullOrBlank()) {
+                if (credential.isNullOrBlank() && currentPlatform != SharePlatform.WEIYUN) {
                     downloadError = "请先登录网盘"
                     return@launch
                 }
@@ -499,6 +504,7 @@ class ResolveViewModel(
         SharePlatform.BAIDU -> baiduAccountRepository.getAccount()?.cookie
         SharePlatform.C139 -> c139AccountRepository.getAccount()?.cookie
         SharePlatform.PAN123 -> pan123AccountRepository.getAccount()?.accessToken
+        SharePlatform.WEIYUN -> weiyunAccountRepository.getAccount()?.cookie
         else -> accountRepository.getAccount()?.cookie
     }
 
@@ -508,6 +514,7 @@ class ResolveViewModel(
         SharePlatform.BAIDU -> baiduResolveRepository
         SharePlatform.C139 -> c139ResolveRepository
         SharePlatform.PAN123 -> pan123ResolveRepository
+        SharePlatform.WEIYUN -> weiyunResolveRepository
         else -> resolveRepository
     }
 
@@ -517,6 +524,7 @@ class ResolveViewModel(
         SharePlatform.BAIDU -> ""
         SharePlatform.C139 -> "0"
         SharePlatform.PAN123 -> "0"
+        SharePlatform.WEIYUN -> "root"
         else -> QuarkConstants.DEFAULT_PDIR_FID
     }
 
@@ -526,6 +534,7 @@ class ResolveViewModel(
         SharePlatform.BAIDU -> "百度网盘"
         SharePlatform.C139 -> "139 网盘"
         SharePlatform.PAN123 -> "123云盘"
+        SharePlatform.WEIYUN -> "微云"
         else -> "夸克网盘"
     }
 
@@ -542,7 +551,8 @@ class ResolveViewModel(
             }
             currentPlatform = parsed.platform
             val credential = currentCredential()
-            if (credential.isNullOrBlank()) {
+            // 微云分享支持匿名解析（无需登录即可浏览/下载）；其余平台必须登录
+            if (credential.isNullOrBlank() && currentPlatform != SharePlatform.WEIYUN) {
                 uiState = ResolveUiState.Error("请先在「网盘」页登录${platformName()}")
                 return@launch
             }
@@ -570,7 +580,7 @@ class ResolveViewModel(
         viewModelScope.launch {
             uiState = ResolveUiState.Loading
             val credential = currentCredential()
-            if (credential.isNullOrBlank()) {
+            if (credential.isNullOrBlank() && currentPlatform != SharePlatform.WEIYUN) {
                 uiState = ResolveUiState.Error("登录已失效，请重新登录")
                 return@launch
             }
@@ -665,7 +675,7 @@ class ResolveViewModel(
                     return@launch
                 }
                 val credential = currentCredential()
-                if (credential.isNullOrBlank()) {
+                if (credential.isNullOrBlank() && currentPlatform != SharePlatform.WEIYUN) {
                     downloadError = "登录已失效，请重新登录"
                     return@launch
                 }
@@ -712,6 +722,7 @@ class ResolveViewModel(
         val isBaidu = currentPlatform == SharePlatform.BAIDU
         val isC139 = currentPlatform == SharePlatform.C139
         val isPan123 = currentPlatform == SharePlatform.PAN123
+        val isWeiyun = currentPlatform == SharePlatform.WEIYUN
         val isQuark = currentPlatform == SharePlatform.QUARK
         // 下载来源平台：按平台应用下载线程数设置
         val platform = when {
@@ -720,6 +731,7 @@ class ResolveViewModel(
             isBaidu -> DownloadPlatform.BAIDU
             isC139 -> DownloadPlatform.C139
             isPan123 -> DownloadPlatform.PAN123
+            isWeiyun -> DownloadPlatform.WEIYUN
             else -> DownloadPlatform.QUARK
         }
         // 【关键修复】夸克/UC 共用 __puus：取链与下载必须用同一份已刷新 Cookie（AlistGo/alist#830 类缺陷）
@@ -742,6 +754,21 @@ class ResolveViewModel(
                 "User-Agent" to Pan123Constants.WEB_UA,
                 "Referer" to Pan123Constants.DOWNLOAD_REFERER
             )
+            // 微云：https_download_url 需要携带直链 cookie（cookie_name=cookie_value）与登录态，防 403
+            isWeiyun -> {
+                val cookie = buildString {
+                    if (link.downloadCookie.isNotBlank()) {
+                        append(link.downloadCookie)
+                        append("; ")
+                    }
+                    append(credential)
+                }.trimEnd(' ', ';')
+                mapOf(
+                    "User-Agent" to WeiyunConstants.UA,
+                    "Referer" to WeiyunConstants.SHARE_HOST + "/",
+                    "Cookie" to cookie
+                )
+            }
             // UC：OSS 直链按 Referer 档位限速（缺 Referer 被 Callback 限到 ~100 KB/s），
             // 补官方 Web 客户端同款 Referer/Origin 即满速
             isUC -> mapOf(
@@ -824,6 +851,8 @@ class ResolveViewModel(
         private val c139ResolveRepository: C139ResolveRepository,
         private val pan123AccountRepository: Pan123AccountRepository,
         private val pan123ResolveRepository: Pan123ResolveRepository,
+        private val weiyunAccountRepository: WeiyunAccountRepository,
+        private val weiyunResolveRepository: WeiyunResolveRepository,
         private val downloadManager: DownloadManager,
         private val bookmarkDao: BookmarkDao
     ) : ViewModelProvider.Factory {
@@ -837,6 +866,7 @@ class ResolveViewModel(
                 baiduAccountRepository, baiduResolveRepository,
                 c139AccountRepository, c139ResolveRepository,
                 pan123AccountRepository, pan123ResolveRepository,
+                weiyunAccountRepository, weiyunResolveRepository,
                 downloadManager,
                 bookmarkDao
             ) as T

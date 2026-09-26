@@ -266,7 +266,8 @@ private fun PlatformCard() {
         "迅雷网盘" to Icons.Outlined.Speed,
         "百度网盘" to Icons.Outlined.Link,
         "139 网盘" to Icons.Outlined.Cloud,
-        "123云盘" to Icons.Outlined.Cloud
+        "123云盘" to Icons.Outlined.Cloud,
+        "微云" to Icons.Outlined.Cloud
     )
     SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -315,7 +316,7 @@ private fun PlatformCard() {
 @Composable
 private fun FeatureCard() {
     val features = listOf(
-        "一键解析分享链接" to "夸克 / UC / 迅雷 / 百度 / 139 / 123 分享直链识别",
+        "一键解析分享链接" to "夸克 / UC / 迅雷 / 百度 / 139 / 123 / 微云 分享直链识别",
         "高速分片下载" to "多线程并发 + 断点续传，充分利用带宽",
         "取链即删" to "转存后立即清理，不留残留",
         "凭证本地化" to "Cookie 加密落库，仅存本机"

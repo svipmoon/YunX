@@ -75,6 +75,7 @@ import com.yunx.app.data.db.C139AccountEntity
 import com.yunx.app.data.db.Pan123AccountEntity
 import com.yunx.app.data.db.QuarkAccountEntity
 import com.yunx.app.data.db.UCAccountEntity
+import com.yunx.app.data.db.WeiyunAccountEntity
 import com.yunx.app.data.db.XunleiAccountEntity
 import com.yunx.app.data.network.model.QuotaInfo
 import com.yunx.app.ui.viewmodel.BaiduCloudViewModel
@@ -83,6 +84,7 @@ import com.yunx.app.ui.viewmodel.DriveQuotaViewModel
 import com.yunx.app.ui.viewmodel.Pan123CloudViewModel
 import com.yunx.app.ui.viewmodel.QuarkCloudViewModel
 import com.yunx.app.ui.viewmodel.UCCoudViewModel
+import com.yunx.app.ui.viewmodel.WeiyunCloudViewModel
 import com.yunx.app.ui.viewmodel.XunleiCloudViewModel
 
 /**
@@ -112,6 +114,7 @@ fun DriveScreen(
     baiduAccount: BaiduAccountEntity?,
     c139Account: C139AccountEntity?,
     pan123Account: Pan123AccountEntity?,
+    weiyunAccount: WeiyunAccountEntity?,
     /** 夸克云盘浏览 ViewModel（网盘 Tab 内切换展示，非全屏） */
     quarkCloudViewModel: QuarkCloudViewModel,
     /** UC 网盘云盘浏览 ViewModel */
@@ -124,6 +127,8 @@ fun DriveScreen(
     c139CloudViewModel: C139CloudViewModel,
     /** 123 云盘浏览 ViewModel */
     pan123CloudViewModel: Pan123CloudViewModel,
+    /** 微云云盘浏览 ViewModel */
+    weiyunCloudViewModel: WeiyunCloudViewModel,
     /** 网盘空间详情 ViewModel（顶部空间总览） */
     driveQuotaViewModel: DriveQuotaViewModel,
     onQuarkLogin: () -> Unit,
@@ -140,6 +145,8 @@ fun DriveScreen(
     onC139Logout: () -> Unit,
     onPan123Login: () -> Unit,
     onPan123Logout: () -> Unit,
+    onWeiyunLogin: () -> Unit,
+    onWeiyunLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showQuarkSheet by remember { mutableStateOf(false) }
@@ -148,6 +155,7 @@ fun DriveScreen(
     var showBaiduSheet by remember { mutableStateOf(false) }
     var showC139Sheet by remember { mutableStateOf(false) }
     var showPan123Sheet by remember { mutableStateOf(false) }
+    var showWeiyunSheet by remember { mutableStateOf(false) }
     // 夸克云盘浏览：网盘 Tab 内切换（非全屏），切 Tab 再回来仍保留
     var showCloud by rememberSaveable { mutableStateOf(false) }
     // UC 网盘云盘浏览：网盘 Tab 内切换（非全屏）
@@ -160,6 +168,8 @@ fun DriveScreen(
     var showC139Cloud by rememberSaveable { mutableStateOf(false) }
     // 123 云盘浏览：网盘 Tab 内切换（非全屏）
     var showPan123Cloud by rememberSaveable { mutableStateOf(false) }
+    // 微云云盘浏览：网盘 Tab 内切换（非全屏）
+    var showWeiyunCloud by rememberSaveable { mutableStateOf(false) }
 
     // 夸克：登录态由数据库驱动；已登录则副标题显示昵称
     val quark = DriveAccount(
@@ -204,6 +214,13 @@ fun DriveScreen(
         avatarText = "123",
         isLoggedIn = pan123Account != null
     )
+    val weiyun = DriveAccount(
+        id = "weiyun",
+        name = "微云",
+        description = weiyunAccount?.nickname ?: "点击登录，扫码解析下载",
+        avatarText = "微",
+        isLoggedIn = weiyunAccount != null
+    )
     val others = remember {
         emptyList<DriveAccount>()
     }
@@ -215,7 +232,7 @@ fun DriveScreen(
     // 下拉刷新状态：绑定空间配额加载中状态
     val isRefreshing by driveQuotaViewModel.loading.collectAsState()
 
-    // 账号列表 ↔ 夸克云盘 ↔ UC 云盘 ↔ 迅雷云盘 ↔ 百度云盘 ↔ 139 云盘 ↔ 123 云盘：平滑过渡（淡入 + 轻微缩放，不僵硬）
+    // 账号列表 ↔ 夸克云盘 ↔ UC 云盘 ↔ 迅雷云盘 ↔ 百度云盘 ↔ 139 云盘 ↔ 123 云盘 ↔ 微云云盘：平滑过渡（淡入 + 轻微缩放，不僵硬）
     AnimatedContent(
         targetState = when {
             showCloud -> 1
@@ -224,6 +241,7 @@ fun DriveScreen(
             showBaiduCloud -> 4
             showC139Cloud -> 5
             showPan123Cloud -> 6
+            showWeiyunCloud -> 7
             else -> 0
         },
         transitionSpec = {
@@ -267,6 +285,12 @@ fun DriveScreen(
             viewModel = pan123CloudViewModel,
             scrollBehavior = scrollBehavior,
             onExit = { showPan123Cloud = false },
+            onDownloadStarted = onDownloadStarted
+        )
+        7 -> WeiyunCloudScreen(
+            viewModel = weiyunCloudViewModel,
+            scrollBehavior = scrollBehavior,
+            onExit = { showWeiyunCloud = false },
             onDownloadStarted = onDownloadStarted
         )
             else -> PullToRefreshBox(
@@ -385,6 +409,22 @@ fun DriveScreen(
                         }
                     )
                 }
+                item(key = weiyun.id) {
+                    DriveAccountCard(
+                        account = weiyun,
+                        quota = driveQuotaViewModel.weiyunQuota.collectAsState().value,
+                        onClick = if (weiyun.isLoggedIn) {
+                            { showWeiyunCloud = true }
+                        } else {
+                            onWeiyunLogin
+                        },
+                        onMoreClick = if (weiyun.isLoggedIn) {
+                            { showWeiyunSheet = true }
+                        } else {
+                            null
+                        }
+                    )
+                }
                 items(others, key = { it.id }) { account ->
                     DriveAccountCard(account = account)
                 }
@@ -462,6 +502,18 @@ fun DriveScreen(
                 showPan123Sheet = false
             },
             onDismiss = { showPan123Sheet = false }
+        )
+    }
+
+    // 已登录微云：点击卡片弹出账号信息底部弹窗
+    if (showWeiyunSheet && weiyunAccount != null) {
+        WeiyunAccountSheet(
+            account = weiyunAccount,
+            onLogout = {
+                onWeiyunLogout()
+                showWeiyunSheet = false
+            },
+            onDismiss = { showWeiyunSheet = false }
         )
     }
 }

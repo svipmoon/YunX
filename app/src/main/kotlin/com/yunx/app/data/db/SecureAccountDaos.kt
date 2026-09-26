@@ -98,6 +98,17 @@ internal object SecureAccountDaos {
         override suspend fun clear() = raw.clear()
     }
 
+    fun weiyun(raw: WeiyunAccountDao, cipher: CredentialCipher): WeiyunAccountDao = object : WeiyunAccountDao {
+        override fun observeAccount(): Flow<WeiyunAccountEntity?> = raw.observeAccount().map { value ->
+            value?.let { decryptWeiyun(raw, cipher, it) }
+        }
+        override suspend fun upsert(account: WeiyunAccountEntity) = withContext(Dispatchers.IO) {
+            raw.upsert(encryptWeiyun(cipher, account))
+        }
+        override suspend fun getAccount(): WeiyunAccountEntity? = raw.getAccount()?.let { decryptWeiyun(raw, cipher, it) }
+        override suspend fun clear() = raw.clear()
+    }
+
     private suspend fun decryptQuark(raw: QuarkAccountDao, cipher: CredentialCipher, stored: QuarkAccountEntity): QuarkAccountEntity? =
         withContext(Dispatchers.IO) {
             decryptOrClear(raw::clear) {
@@ -164,6 +175,15 @@ internal object SecureAccountDaos {
             }
         }
 
+    private suspend fun decryptWeiyun(raw: WeiyunAccountDao, cipher: CredentialCipher, stored: WeiyunAccountEntity): WeiyunAccountEntity? =
+        withContext(Dispatchers.IO) {
+            decryptOrClear(raw::clear) {
+                val plain = stored.copy(cookie = cipher.decrypt(stored.cookie, "weiyun.cookie"))
+                if (!cipher.isEncrypted(stored.cookie)) raw.upsert(encryptWeiyun(cipher, plain))
+                plain
+            }
+        }
+
     private fun encryptQuark(cipher: CredentialCipher, value: QuarkAccountEntity) =
         value.copy(cookie = cipher.encrypt(value.cookie, "quark.cookie"))
     private fun encryptUc(cipher: CredentialCipher, value: UCAccountEntity) =
@@ -182,6 +202,9 @@ internal object SecureAccountDaos {
         deviceId = cipher.encrypt(value.deviceId, "xunlei.deviceId"),
         captchaToken = cipher.encrypt(value.captchaToken, "xunlei.captchaToken")
     )
+
+    private fun encryptWeiyun(cipher: CredentialCipher, value: WeiyunAccountEntity) =
+        value.copy(cookie = cipher.encrypt(value.cookie, "weiyun.cookie"))
 
     private suspend fun <T> decryptOrClear(clear: suspend () -> Unit, block: suspend () -> T): T? =
         try {

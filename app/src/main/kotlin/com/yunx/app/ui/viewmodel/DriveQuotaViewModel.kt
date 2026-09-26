@@ -26,6 +26,7 @@ import com.yunx.app.data.network.C139Api
 import com.yunx.app.data.network.Pan123Api
 import com.yunx.app.data.network.QuarkApi
 import com.yunx.app.data.network.UCApi
+import com.yunx.app.data.network.WeiyunApi
 import com.yunx.app.data.network.XunleiApi
 import com.yunx.app.data.network.model.QuotaInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,7 +53,9 @@ class DriveQuotaViewModel(
     private val c139Api: C139Api,
     private val c139Cookie: suspend () -> String?,
     private val pan123Api: Pan123Api,
-    private val pan123Token: suspend () -> String?
+    private val pan123Token: suspend () -> String?,
+    private val weiyunApi: WeiyunApi,
+    private val weiyunCookie: suspend () -> String?
 ) : ViewModel() {
 
     private val _quarkQuota = MutableStateFlow<QuotaInfo?>(null)
@@ -72,6 +75,9 @@ class DriveQuotaViewModel(
 
     private val _pan123Quota = MutableStateFlow<QuotaInfo?>(null)
     val pan123Quota: StateFlow<QuotaInfo?> = _pan123Quota.asStateFlow()
+
+    private val _weiyunQuota = MutableStateFlow<QuotaInfo?>(null)
+    val weiyunQuota: StateFlow<QuotaInfo?> = _weiyunQuota.asStateFlow()
 
     /** 是否加载中 */
     val loading = MutableStateFlow(false)
@@ -126,6 +132,13 @@ class DriveQuotaViewModel(
                         _pan123Quota.value = runCatching { pan123Api.getQuota(p123) }.getOrNull()
                     }
                 }
+                // 微云
+                launch {
+                    val wy = weiyunCookie()
+                    if (wy != null) {
+                        _weiyunQuota.value = runCatching { weiyunApi.getQuota(wy) }.getOrNull()
+                    }
+                }
             }
             loading.value = false
         }
@@ -145,7 +158,9 @@ class DriveQuotaViewModel(
         private val c139Api: C139Api,
         private val c139Cookie: suspend () -> String?,
         private val pan123Api: Pan123Api,
-        private val pan123Token: suspend () -> String?
+        private val pan123Token: suspend () -> String?,
+        private val weiyunApi: WeiyunApi,
+        private val weiyunCookie: suspend () -> String?
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -155,7 +170,8 @@ class DriveQuotaViewModel(
                 xunleiApi, xunleiToken, xunleiDeviceId, xunleiCaptcha,
                 baiduApi, baiduCookie,
                 c139Api, c139Cookie,
-                pan123Api, pan123Token
+                pan123Api, pan123Token,
+                weiyunApi, weiyunCookie
             ) as T
     }
 }

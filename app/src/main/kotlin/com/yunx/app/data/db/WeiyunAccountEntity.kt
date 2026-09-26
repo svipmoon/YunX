@@ -16,20 +16,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.yunx.app.data.download
+package com.yunx.app.data.db
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
 /**
- * 下载来源平台标识（用于按平台独立设置下载线程数）。
- * 字符串常量而非枚举：便于直接持久化到 Room 字段，也与各 ViewModel 解耦。
+ * 微云（腾讯微云）登录凭证（cookie 落库，后续所有 API 请求携带）。
+ * 关键字段：p_skey / wyctoken / wy_uf / openid（QQ 或微信扫码登录后从 CookieManager 提取）。
  */
-object DownloadPlatform {
-    const val QUARK = "quark"
-    const val UC = "uc"
-    const val XUNLEI = "xunlei"
-    const val BAIDU = "baidu"
-    const val C139 = "c139"
-    const val PAN123 = "pan123"
-    const val WEIYUN = "weiyun"
-    /** 通用/未知来源（手动添加、应用更新下载等） */
-    const val GENERIC = "generic"
-}
+@Entity(tableName = "weiyun_account")
+data class WeiyunAccountEntity(
+    @PrimaryKey
+    val id: String = "weiyun",
+    val cookie: String = "",
+    val nickname: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
+)

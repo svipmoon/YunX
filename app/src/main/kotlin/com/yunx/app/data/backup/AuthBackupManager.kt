@@ -36,6 +36,8 @@ import com.yunx.app.data.db.UCAccountDao
 import com.yunx.app.data.db.UCAccountEntity
 import com.yunx.app.data.db.XunleiAccountDao
 import com.yunx.app.data.db.XunleiAccountEntity
+import com.yunx.app.data.db.WeiyunAccountDao
+import com.yunx.app.data.db.WeiyunAccountEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -56,7 +58,8 @@ class AuthBackupManager(
     private val xunleiDao: XunleiAccountDao,
     private val baiduDao: BaiduAccountDao,
     private val c139Dao: C139AccountDao,
-    private val pan123Dao: Pan123AccountDao
+    private val pan123Dao: Pan123AccountDao,
+    private val weiyunDao: WeiyunAccountDao
 ) {
 
     private companion object {
@@ -135,6 +138,15 @@ class AuthBackupManager(
                     .put("platform", "pan123")
                     .put("accessToken", a.accessToken)
                     .put("account", a.account)
+                    .put("nickname", a.nickname)
+                    .put("updatedAt", a.updatedAt)
+            )
+        }
+        weiyunDao.getAccount()?.let { a ->
+            if (!onlyLoggedIn || a.cookie.isNotBlank()) accounts.put(
+                JSONObject()
+                    .put("platform", "weiyun")
+                    .put("cookie", a.cookie)
                     .put("nickname", a.nickname)
                     .put("updatedAt", a.updatedAt)
             )
@@ -239,6 +251,18 @@ class AuthBackupManager(
                             Pan123AccountEntity(
                                 id = "pan123", accessToken = t,
                                 account = obj.optString("account"),
+                                nickname = obj.optString("nickname"),
+                                updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
+                            )
+                        ); count++
+                    }
+                }
+                "weiyun" -> {
+                    val c = obj.optString("cookie")
+                    if (c.isNotBlank()) {
+                        weiyunDao.upsert(
+                            WeiyunAccountEntity(
+                                id = "weiyun", cookie = c,
                                 nickname = obj.optString("nickname"),
                                 updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
                             )

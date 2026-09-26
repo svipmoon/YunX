@@ -91,6 +91,7 @@ import com.yunx.app.data.network.C139Api
 import com.yunx.app.data.network.Pan123Api
 import com.yunx.app.data.network.QuarkApi
 import com.yunx.app.data.network.UCApi
+import com.yunx.app.data.network.WeiyunApi
 import com.yunx.app.data.network.XunleiApi
 import com.yunx.app.data.prefs.SettingsRepository
 import com.yunx.app.data.update.UpdateChecker
@@ -106,11 +107,14 @@ import com.yunx.app.data.repository.UCAccountRepository
 import com.yunx.app.data.repository.UCResolveRepository
 import com.yunx.app.data.repository.XunleiAccountRepository
 import com.yunx.app.data.repository.XunleiResolveRepository
+import com.yunx.app.data.repository.WeiyunAccountRepository
+import com.yunx.app.data.repository.WeiyunResolveRepository
 import com.yunx.app.ui.login.BaiduLoginScreen
 import com.yunx.app.ui.login.C139LoginScreen
 import com.yunx.app.ui.login.Pan123LoginScreen
 import com.yunx.app.ui.login.QuarkLoginScreen
 import com.yunx.app.ui.login.UCLoginScreen
+import com.yunx.app.ui.login.WeiyunLoginScreen
 import com.yunx.app.ui.login.XunleiLoginScreen
 import com.yunx.app.ui.login.XunleiVerifyWebViewScreen
 import com.yunx.app.ui.navigation.MainTab
@@ -138,6 +142,8 @@ import com.yunx.app.ui.viewmodel.QuarkCloudViewModel
 import com.yunx.app.ui.viewmodel.ResolveViewModel
 import com.yunx.app.ui.viewmodel.UCCoudViewModel
 import com.yunx.app.ui.viewmodel.UCAccountViewModel
+import com.yunx.app.ui.viewmodel.WeiyunAccountViewModel
+import com.yunx.app.ui.viewmodel.WeiyunCloudViewModel
 import com.yunx.app.ui.viewmodel.XunleiAccountViewModel
 import com.yunx.app.ui.viewmodel.XunleiCloudViewModel
 import kotlinx.coroutines.CompletableDeferred
@@ -167,6 +173,7 @@ fun MainScreen() {
     var showBaiduLogin by rememberSaveable { mutableStateOf(false) }
     var showC139Login by rememberSaveable { mutableStateOf(false) }
     var showPan123Login by rememberSaveable { mutableStateOf(false) }
+    var showWeiyunLogin by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
     var showSupport by rememberSaveable { mutableStateOf(false) }
     var showTheme by rememberSaveable { mutableStateOf(false) }
@@ -205,6 +212,7 @@ fun MainScreen() {
     val baiduApi = remember { BaiduApi() }
     val c139Api = remember { C139Api() }
     val pan123Api = remember { Pan123Api() }
+    val weiyunApi = remember { WeiyunApi() }
     val db = remember { AppDatabase.get(context) }
     val settings = remember { SettingsRepository(context) }
     val repository = remember {
@@ -225,6 +233,9 @@ fun MainScreen() {
     val pan123Repository = remember {
         Pan123AccountRepository(db.pan123AccountDao(), pan123Api)
     }
+    val weiyunRepository = remember {
+        WeiyunAccountRepository(db.weiyunAccountDao(), weiyunApi)
+    }
     // 网盘认证备份：打包/恢复各平台凭证
     val backupManager = remember {
         AuthBackupManager(
@@ -233,7 +244,8 @@ fun MainScreen() {
             db.xunleiAccountDao(),
             db.baiduAccountDao(),
             db.c139AccountDao(),
-            db.pan123AccountDao()
+            db.pan123AccountDao(),
+            db.weiyunAccountDao()
         )
     }
     // 下载管理器：OkHttp 分片下载器 + Room 任务持久化 + 可配置线程数（设置页动态生效）
@@ -297,6 +309,9 @@ fun MainScreen() {
     val pan123ViewModel: Pan123AccountViewModel = viewModel(
         factory = Pan123AccountViewModel.Factory(pan123Repository)
     )
+    val weiyunViewModel: WeiyunAccountViewModel = viewModel(
+        factory = WeiyunAccountViewModel.Factory(weiyunRepository)
+    )
     // 各平台「账号是否已登录」流：云盘浏览 VM 在启动期（未登录）init 加载会残留「请先登录…」错误态，
     // 首次登录成功后由 VM 监听该流自动重载根目录（见各 XxxCloudViewModel init）
     val quarkLoginState = remember { repository.observeAccount().map { it != null } }
@@ -305,6 +320,7 @@ fun MainScreen() {
     val baiduLoginState = remember { baiduRepository.observeAccount().map { it != null } }
     val c139LoginState = remember { c139Repository.observeAccount().map { it != null } }
     val pan123LoginState = remember { pan123Repository.observeAccount().map { it != null } }
+    val weiyunLoginState = remember { weiyunRepository.observeAccount().map { it != null } }
     // 夸克云盘浏览：作为网盘 Tab 内容展示（非全屏），cookie 从数据库读取（避免 StateFlow 初始值为空的竞态）；
     // 下载前经 getFreshCookie 惰性刷新 __puus（修复 AlistGo/alist#830 下载 412）
     val quarkCloudViewModel: QuarkCloudViewModel = viewModel(
@@ -371,6 +387,15 @@ fun MainScreen() {
             loginState = pan123LoginState
         )
     )
+    // 微云云盘浏览：点击已登录的微云卡片打开（cookie 从数据库读取）
+    val weiyunCloudViewModel: WeiyunCloudViewModel = viewModel(
+        factory = WeiyunCloudViewModel.Factory(
+            weiyunApi,
+            { weiyunRepository.getAccount()?.cookie },
+            downloadManager,
+            loginState = weiyunLoginState
+        )
+    )
     // 网盘空间详情：网盘页顶部「空间总览」展示 6 平台容量使用
     val driveQuotaViewModel: DriveQuotaViewModel = viewModel(
         factory = DriveQuotaViewModel.Factory(
@@ -382,7 +407,8 @@ fun MainScreen() {
             { xunleiRepository.getAccount()?.captchaToken },
             baiduApi, { baiduRepository.getAccount()?.cookie },
             c139Api, { c139Repository.getAccount()?.cookie },
-            pan123Api, { pan123Repository.getAccount()?.accessToken }
+            pan123Api, { pan123Repository.getAccount()?.accessToken },
+            weiyunApi, { weiyunRepository.getAccount()?.cookie }
         )
     )
     val xunleiResolveRepository = remember {
@@ -413,6 +439,12 @@ fun MainScreen() {
             tokenProvider = { pan123Repository.getAccount()?.accessToken }
         )
     }
+    val weiyunResolveRepository = remember {
+        WeiyunResolveRepository(
+            api = weiyunApi,
+            cookieProvider = { weiyunRepository.getAccount()?.cookie }
+        )
+    }
     val resolveViewModel: ResolveViewModel = viewModel(
         factory = ResolveViewModel.Factory(
             repository,
@@ -427,6 +459,8 @@ fun MainScreen() {
             c139ResolveRepository,
             pan123Repository,
             pan123ResolveRepository,
+            weiyunRepository,
+            weiyunResolveRepository,
             downloadManager,
             db.bookmarkDao()
         )
@@ -443,6 +477,7 @@ fun MainScreen() {
     val baiduAccount by baiduViewModel.baiduAccount.collectAsState()
     val c139Account by c139ViewModel.c139Account.collectAsState()
     val pan123Account by pan123ViewModel.pan123Account.collectAsState()
+    val weiyunAccount by weiyunViewModel.weiyunAccount.collectAsState()
 
     // 首次下载引导：锁屏保持下载默认开启，但新用户未加入「忽略电池优化」白名单 →引导一次
     var showBatteryGuide by remember { mutableStateOf(false) }
@@ -581,6 +616,16 @@ fun MainScreen() {
         return
     }
 
+    // 微云登录页：全屏覆盖（WebView 打开官网，QQ/微信扫码登录提取 Cookie）
+    if (showWeiyunLogin) {
+        WeiyunLoginScreen(
+            viewModel = weiyunViewModel,
+            onBack = { showWeiyunLogin = false },
+            onSaved = { showWeiyunLogin = false }
+        )
+        return
+    }
+
     // 折叠标题状态提升到本层：跨页面共享，页面切换时折叠/展开状态保持不变
     // 用 exitUntilCollapsed（默认实现，含松手吸附）：滚动时标题先收起再滚内容；
     // 向上滚动回顶部过程中标题保持收起，只有列表到达最顶部后继续下拉（overscroll）才重新展开
@@ -644,7 +689,8 @@ fun MainScreen() {
                         baiduCloudViewModel,
                         c139CloudViewModel,
                         ucCloudViewModel,
-                        pan123CloudViewModel
+                        pan123CloudViewModel,
+                        weiyunCloudViewModel
                     )
                     MainTab.Drive -> DriveScreen(
                         scrollBehavior = scrollBehavior,
@@ -654,12 +700,14 @@ fun MainScreen() {
                         baiduAccount = baiduAccount,
                         c139Account = c139Account,
                         pan123Account = pan123Account,
+                        weiyunAccount = weiyunAccount,
                         quarkCloudViewModel = quarkCloudViewModel,
                         ucCloudViewModel = ucCloudViewModel,
                         xunleiCloudViewModel = xunleiCloudViewModel,
                         baiduCloudViewModel = baiduCloudViewModel,
                         c139CloudViewModel = c139CloudViewModel,
                         pan123CloudViewModel = pan123CloudViewModel,
+                        weiyunCloudViewModel = weiyunCloudViewModel,
                         driveQuotaViewModel = driveQuotaViewModel,
                         onQuarkLogin = { showQuarkLogin = true },
                         onQuarkLogout = { viewModel.logout() },
@@ -673,7 +721,9 @@ fun MainScreen() {
                         onC139Login = { showC139Login = true },
                         onC139Logout = { c139ViewModel.logout() },
                         onPan123Login = { showPan123Login = true },
-                        onPan123Logout = { pan123ViewModel.logout() }
+                        onPan123Logout = { pan123ViewModel.logout() },
+                        onWeiyunLogin = { showWeiyunLogin = true },
+                        onWeiyunLogout = { weiyunViewModel.logout() }
                     )
                     MainTab.Download -> DownloadScreen(scrollBehavior, downloadViewModel)
                     MainTab.Settings -> SettingsScreen(

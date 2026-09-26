@@ -72,6 +72,8 @@ data class QuotaInfo(
 /**
  * 下载直链。
  * @param cleanupDirFid 下载完成后需删除的临时转存子目录 fid（根治夸克去重返回已删 fid）；null 表示无需清理
+ * @param isHls 是否为 HLS（m3u8）转码流地址：下载走 HLS 分片合并路径（UC play 绕过会员墙）
+ * @param downloadCookie 部分 CDN 需要额外携带的 Cookie（如微云 FTN5K=xxx）；解析直链时带回，下载时拼进请求头
  */
 data class DownloadLink(
     val fid: String,
@@ -80,7 +82,9 @@ data class DownloadLink(
     val size: Long,
     val cleanupDirFid: String? = null,
     /** 是否为 HLS（m3u8）转码流地址：下载走 HLS 分片合并路径（UC play 绕过会员墙） */
-    val isHls: Boolean = false
+    val isHls: Boolean = false,
+    /** 下载直链所需额外 Cookie（微云 https_download_url 需携带 cookie_name=cookie_value 防 403） */
+    val downloadCookie: String = ""
 )
 
 /** UC 转码播放流（绕过非会员视频下载被换成宣传片的问题；url 为 m3u8/fmp4 分片地址） */
